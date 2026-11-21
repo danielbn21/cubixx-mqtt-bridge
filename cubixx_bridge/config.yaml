@@ -1,5 +1,5 @@
 name: "Cubixx MQTT Bridge"
-version: "1.0.0"
+version: "1.0.1"
 slug: cubixx_bridge
 description: "Bridge Cubixx relay switches to MQTT, with Home Assistant discovery and a web UI"
 arch:

@@ -32,7 +32,7 @@ Requires Home Assistant OS or Supervised, plus the **Mosquitto broker** app with
    **Settings → Apps → App store → ⋮ → Repositories** and add:
 
    ```
-   https://github.com/danielbn21/cubixx-mqtt-bridge
+   https://github.com/YOUR_USERNAME/cubixx-mqtt-bridge
    ```
 
 2. Find **Cubixx MQTT Bridge** in the store (you may need to reload the page), then **Install** and **Start**.
@@ -47,7 +47,7 @@ Updates appear in Home Assistant when the `version` in `cubixx_bridge/config.yam
 ## Option B: Docker
 
 ```bash
-git clone https://github.com/danielbn21/cubixx-mqtt-bridge.git
+git clone https://github.com/YOUR_USERNAME/cubixx-mqtt-bridge.git
 cd cubixx-mqtt-bridge
 docker compose up -d --build
 ```
@@ -146,4 +146,4 @@ When you change the code, bump `version` in `cubixx_bridge/config.yaml` and add 
 `cubixx_bridge/CHANGELOG.md` so Home Assistant offers the update.
 
 [repo-badge]: https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg
-[repo-url]: https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fdanielbn21%2Fcubixx-mqtt-bridge
+[repo-url]: https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FYOUR_USERNAME%2Fcubixx-mqtt-bridge
