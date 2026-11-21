@@ -10,7 +10,7 @@ startup: application
 boot: auto
 ingress: true
 ingress_port: 8080
-panel_icon: "mdi:light-switch"
+panel_icon: "mdi:close-box"
 panel_title: "Cubixx"
 watchdog: "tcp://[HOST]:[PORT:8080]"
 services:
