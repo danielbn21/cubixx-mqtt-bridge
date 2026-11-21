@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cubixx MQTT Bridge</title>
+<style>
+:root {
+  --bg: #f3f4f6; --card: #ffffff; --text: #111827; --muted: #6b7280; --border: #e5e7eb;
+  --accent: #2563eb; --ok: #16a34a; --okbg: #dcfce7; --bad: #dc2626; --badbg: #fee2e2;
+  --warn: #b45309; --warnbg: #fef3c7; --input: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155;
+    --accent: #60a5fa; --ok: #4ade80; --okbg: #14532d; --bad: #f87171; --badbg: #7f1d1d;
+    --warn: #fbbf24; --warnbg: #78350f; --input: #0f172a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
+main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 60px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+h1 { margin: 0; font-size: 22px; color: var(--accent); }
+h2 { margin: 0; font-size: 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.muted { color: var(--muted); font-size: 13px; }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill.ok { background: var(--okbg); color: var(--ok); }
+.pill.bad { background: var(--badbg); color: var(--bad); }
+.pill.warn { background: var(--warnbg); color: var(--warn); }
+.pill.off { background: var(--border); color: var(--muted); }
+button { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--bad); }
+button.small { padding: 3px 9px; font-size: 13px; }
+input { font: inherit; width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input); color: var(--text); }
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 3px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+#devices { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.dev { margin: 0; }
+.relays { margin-top: 12px; border-top: 1px solid var(--border); }
+.relay { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.relay:last-child { border-bottom: 0; }
+.actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.err { color: var(--bad); font-size: 13px; margin-top: 6px; word-break: break-word; }
+details summary { cursor: pointer; color: var(--accent); margin-top: 10px; }
+dialog { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 14px; padding: 20px; width: min(420px, 92vw); }
+dialog::backdrop { background: rgba(0,0,0,.5); }
+dialog .field { margin-bottom: 12px; }
+.empty { text-align: center; color: var(--muted); padding: 30px 0; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Cubixx MQTT Bridge</h1>
+    <button class="primary" id="addBtn">+ Add switch</button>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <h2>MQTT broker</h2>
+      <span id="mqttPill" class="pill off">...</span>
+    </div>
+    <div id="mqttErr" class="err"></div>
+    <details id="mqttBox">
+      <summary>Broker settings</summary>
+      <form id="mqttForm" style="margin-top:12px">
+        <div class="grid">
+          <div><label>Host</label><input name="host" placeholder="192.168.68.10"></div>
+          <div><label>Port</label><input name="port" type="number" value="1883"></div>
+          <div><label>Username</label><input name="username" autocomplete="off"></div>
+          <div><label>Password</label><input name="password" type="password" autocomplete="new-password" placeholder="(unchanged)"></div>
+          <div><label>Discovery prefix</label><input name="discovery_prefix" value="homeassistant"></div>
+          <div><label>Base topic</label><input name="base_topic" value="cubixx"></div>
+        </div>
+        <div id="mqttManaged" class="muted" style="margin-top:10px" hidden>Broker host, port and credentials are provided by Home Assistant.</div>
+        <div class="actions"><button class="primary" type="submit">Save and reconnect</button></div>
+      </form>
+    </details>
+  </section>
+
+  <div id="devices"></div>
+  <div id="empty" class="empty" hidden>No switches yet. Click “Add switch” to get started.</div>
+</main>
+
+<dialog id="devDlg">
+  <form id="devForm" method="dialog">
+    <h2 id="dlgTitle" style="margin-bottom:14px">Add switch</h2>
+    <div class="field"><label>Name</label><input name="name" placeholder="Hallway and bathroom"></div>
+    <div class="field"><label>IP address or hostname</label><input name="ip" placeholder="192.168.68.102" required></div>
+    <div class="field"><label>Device ID (used in MQTT topics, cannot be changed later)</label><input name="id" placeholder="86cf20"></div>
+    <div class="grid">
+      <div class="field"><label>WebSocket port</label><input name="port" type="number" value="81"></div>
+      <div class="field"><label>Number of relays</label><input name="relays" type="number" value="6" min="1" max="16"></div>
+    </div>
+    <div id="dlgErr" class="err"></div>
+    <div class="actions" style="justify-content:flex-end">
+      <button type="button" id="dlgCancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="msgDlg">
+  <p id="msgText" style="margin-top:0"></p>
+  <div class="actions" style="justify-content:flex-end">
+    <button type="button" id="msgCancel">Cancel</button>
+    <button type="button" id="msgOk" class="primary">OK</button>
+  </div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let editingId = null, formFilled = false, lastDevices = [];
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+
+// In-page replacement for alert()/confirm(), which may be blocked inside an iframe.
+function ask(text, cancellable = false) {
+  return new Promise(resolve => {
+    const dlg = $("#msgDlg");
+    $("#msgText").textContent = text;
+    $("#msgCancel").hidden = !cancellable;
+    const done = v => { dlg.close(); resolve(v); };
+    $("#msgOk").onclick = () => done(true);
+    $("#msgCancel").onclick = () => done(false);
+    dlg.oncancel = () => resolve(false);
+    dlg.showModal();
+  });
+}
+
+function ago(s) {
+  if (s == null) return "never";
+  if (s < 5) return "just now";
+  if (s < 60) return s + " s ago";
+  if (s < 3600) return Math.floor(s / 60) + " min ago";
+  return Math.floor(s / 3600) + " h ago";
+}
+
+function renderMqtt(m) {
+  const pill = $("#mqttPill");
+  if (m.connected) { pill.className = "pill ok"; pill.textContent = "Connected"; }
+  else if (!m.host) { pill.className = "pill warn"; pill.textContent = "Not configured"; }
+  else { pill.className = "pill bad"; pill.textContent = "Disconnected"; }
+  $("#mqttErr").textContent = m.connected ? "" : (m.error || "");
+  const form = $("#mqttForm");
+  for (const k of ["host", "port", "username", "password"]) form.elements[k].disabled = !!m.managed;
+  $("#mqttManaged").hidden = !m.managed;
+  if (!formFilled) {
+    const f = $("#mqttForm");
+    for (const k of ["host", "port", "username", "discovery_prefix", "base_topic"]) f.elements[k].value = m[k] ?? "";
+    f.elements.password.placeholder = m.password_set ? "(unchanged)" : "(none)";
+    if (!m.host && !m.managed) $("#mqttBox").open = true;
+    formFilled = true;
+  }
+}
+
+function renderDevices(devs) {
+  lastDevices = devs;
+  $("#empty").hidden = devs.length > 0;
+  $("#devices").innerHTML = devs.map(d => `
+    <section class="card dev" data-id="${esc(d.id)}">
+      <div class="row">
+        <div>
+          <h2>${esc(d.name)}</h2>
+          <div class="muted"><a href="http://${esc(d.ip)}" target="_blank" rel="noopener">${esc(d.ip)}</a> · ID ${esc(d.id)}</div>
+        </div>
+        <span class="pill ${d.connected ? "ok" : "bad"}">${d.connected ? "Online" : "Offline"}</span>
+      </div>
+      <div class="muted" style="margin-top:6px">Last message: ${ago(d.last_message_age)}</div>
+      ${d.connected || !d.error ? "" : `<div class="err">${esc(d.error)}</div>`}
+      <div class="relays">
+        ${d.relays.length ? d.relays.map(r => `
+          <div class="relay">
+            <span>${esc(r.name)}</span>
+            <span>
+              <span class="pill ${r.state ? "ok" : "off"}">${r.state ? "ON" : "OFF"}</span>
+              <button class="small" data-act="toggle" data-n="${r.index}" data-state="${r.state}" ${d.connected ? "" : "disabled"}>Toggle</button>
+            </span>
+          </div>`).join("") : `<div class="muted" style="padding:8px 0">No relay data yet.</div>`}
+      </div>
+      <div class="actions">
+        <button class="small" data-act="edit">Edit</button>
+        <button class="small danger" data-act="delete">Delete</button>
+      </div>
+    </section>`).join("");
+}
+
+async function refresh() {
+  try {
+    const s = await api("api/state");
+    renderMqtt(s.mqtt);
+    renderDevices(s.devices);
+  } catch (e) {
+    $("#mqttPill").className = "pill bad";
+    $("#mqttPill").textContent = "Bridge unreachable";
+  }
+}
+
+$("#devices").addEventListener("click", async e => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const id = btn.closest(".dev").dataset.id;
+  try {
+    if (btn.dataset.act === "toggle") {
+      await api(`api/devices/${encodeURIComponent(id)}/relay/${btn.dataset.n}`,
+        { method: "POST", body: JSON.stringify({ state: btn.dataset.state !== "true" }) });
+    } else if (btn.dataset.act === "edit") {
+      openDialog(lastDevices.find(d => d.id === id));
+    } else if (btn.dataset.act === "delete") {
+      if (await ask(`Delete "${id}"? Its entities will be removed from Home Assistant.`, true)) {
+        await api(`api/devices/${encodeURIComponent(id)}`, { method: "DELETE" });
+      }
+    }
+    refresh();
+  } catch (err) { await ask(err.message); }
+});
+
+function openDialog(dev) {
+  editingId = dev ? dev.id : null;
+  const f = $("#devForm");
+  $("#dlgTitle").textContent = dev ? "Edit switch" : "Add switch";
+  f.elements.name.value = dev ? dev.name : "";
+  f.elements.ip.value = dev ? dev.ip : "";
+  f.elements.id.value = dev ? dev.id : "";
+  f.elements.id.disabled = !!dev;
+  f.elements.port.value = dev ? dev.port : 81;
+  f.elements.relays.value = dev ? Math.max(dev.relays.length, 1) : 6;
+  $("#dlgErr").textContent = "";
+  $("#devDlg").showModal();
+}
+
+$("#addBtn").onclick = () => openDialog(null);
+$("#dlgCancel").onclick = () => $("#devDlg").close();
+
+$("#devForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const f = e.target.elements;
+  const body = { name: f.name.value, ip: f.ip.value, id: f.id.value, port: f.port.value, relays: f.relays.value };
+  try {
+    if (editingId) await api(`api/devices/${encodeURIComponent(editingId)}`, { method: "PUT", body: JSON.stringify(body) });
+    else await api("api/devices", { method: "POST", body: JSON.stringify(body) });
+    $("#devDlg").close();
+    refresh();
+  } catch (err) { $("#dlgErr").textContent = err.message; }
+});
+
+$("#mqttForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const f = e.target.elements;
+  const body = {};
+  for (const k of ["host", "port", "username", "password", "discovery_prefix", "base_topic"]) body[k] = f[k].value;
+  try {
+    await api("api/mqtt", { method: "PUT", body: JSON.stringify(body) });
+    f.password.value = "";
+    formFilled = false;
+    refresh();
+  } catch (err) { await ask(err.message); }
+});
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

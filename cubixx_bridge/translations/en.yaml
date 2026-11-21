@@ -1,0 +1,13 @@
+configuration:
+  mqtt_host:
+    name: MQTT broker host (optional)
+    description: Leave empty to use the Home Assistant MQTT broker (Mosquitto) automatically. Only set this to use a different broker.
+  mqtt_port:
+    name: MQTT broker port
+    description: Only used when a broker host is set. Defaults to 1883.
+  mqtt_username:
+    name: MQTT username
+    description: Only used when a broker host is set.
+  mqtt_password:
+    name: MQTT password
+    description: Only used when a broker host is set.
